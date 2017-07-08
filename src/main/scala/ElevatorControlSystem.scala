@@ -1,50 +1,143 @@
-import scala.collection.mutable
-
-object ElevatorControlSystem {
-  sealed trait Direction
-  case object Up extends Direction
-  case object Down extends Direction
-
-  case class Floor(value: Int) extends AnyVal
-  case class ElevatorId(value: Int) extends AnyVal
-  case class ElevatorState(current: Floor, target: Floor)
-  case class PickupRequest(floor: Floor, d: Direction)
-  type ElevatorStateMap = Map[ElevatorId, ElevatorState]
-}
-
-import ElevatorControlSystem._
+import ElevatorControlSystemModel._
 
 trait ElevatorControlSystem {
-  def status(): ElevatorStateMap
-  def update(state: ElevatorStateMap): Unit
+  def status(): Seq[Elevator]
+  def update(state: ElevatorControlState): Unit
+  def update(elevator: Elevator): Unit
   def pickup(pr: PickupRequest): Unit
   def step(): Unit
 }
 
-class NaiveElevators extends ElevatorControlSystem {
-  private[this] var stepCounter: Int = 0
-  private[this] val pickupRequest = mutable.Queue.empty[PickupRequest]
-  private[this] val state = mutable.HashMap[ElevatorId, ElevatorState] (
-    ElevatorId(1) -> ElevatorState(Floor(1), Floor(2)),
-    ElevatorId(2) -> ElevatorState(Floor(0), Floor(0))
-  )
+class SimpleElevatorsController extends ElevatorControlSystem {
+  import monocle.macros.syntax.lens._
 
-  override def status(): ElevatorStateMap = state.toMap
+  @volatile var model = Model()
 
-  override def update(updatedState: ElevatorStateMap): Unit =
-    updatedState.foreach {
-      case (id: ElevatorId, targetState: ElevatorState) =>
-        if (state.contains(id)) {
-          state(id) = targetState
-        } else {
-          state.put(id, targetState)
-        }
-    }
+  override def status(): Seq[Elevator] =
+    model.elevatorsSystemState.values.toList
 
-  override def pickup(pr: PickupRequest): Unit = pickupRequest.enqueue(pr)
+  override def update(updatedState: ElevatorControlState): Unit =
+    updatedState.foreach { case (_, elevator) => update(elevator) }
+
+  override def pickup(pr: PickupRequest): Unit = {
+    val processedPr = processNewPR(pr)
+    updateModel(_.lens(_.pickupRequests).modify(_ + processedPr))
+
+    val maybeElevatorToPickup = processedPr.pendingFor flatMap (model.elevatorById(_).get)
+    maybeElevatorToPickup.foreach(
+      elevator =>
+        updateModel(
+          _.elevatorById(elevator.id).set(
+            Some(startServingPickupRequest(elevator, pr))
+          )))
+  }
 
   override def step(): Unit = {
-    stepCounter += 1
-    // do some step logic here, moving elevators etc
+    updateModel(_.lens(_.stepCounter).modify(_ + 1))
+
+    updateModel(
+      _.lens(_.elevatorsSystemState)
+        .modify(_.map {
+          case (id, elevator) => (id, stepAction(elevator))
+        }))
+
+    updateModel(_.lens(_.pickupRequests).modify(filterOutPrs))
   }
+
+  def filterOutPrs(pr: Set[PickupRequest]): Set[PickupRequest] = {
+    val opened = model.elevatorsSystemState.values.toList.filter(_.state.door == Opened)
+    pr.filterNot(v => opened.map(_.state.floor).contains(v.floor))
+  }
+
+  override def update(elevator: Elevator): Unit = {
+    updateModel(
+      _.elevatorById(elevator.id)
+        .set(Some(elevator))
+    )
+  }
+
+  private def stepAction(elevator: Elevator): Elevator = {
+    val currentFloor = elevator.lens(_.state.floor)
+    val targetFloors = elevator.getTargets
+
+    elevator.state.door match {
+      case Opened =>
+        elevator
+          .lens(_.state.door)
+          .set(Closed)
+          .modifyTargets(_ - currentFloor.get)
+      case Closed =>
+        if (targetFloors.contains(currentFloor.get)) {
+          elevator.lens(_.state.door).set(Opened)
+        } else if (targetFloors.isEmpty) {
+          elevator.lens(_.state.direction).set(Idle)
+        } else
+          elevator.state.direction match {
+            case Up =>
+              currentFloor.modify(v => Floor(v.value + 1))
+            case Down =>
+              currentFloor.modify(v => Floor(v.value - 1))
+            case Idle =>
+              findTargets(elevator)
+          }
+    }
+  }
+
+  // assign elevator to a pr
+  // set elevator's target
+  private def startServingPickupRequest(elevator: Elevator, pr: PickupRequest): Elevator = {
+
+    println(s"startServingPickupRequest $pr with $elevator")
+    elevator
+      .modifyTargets(_ + pr.floor)
+      .lens(_.state.direction)
+      .set(elevator.calculateDirection(pr.floor))
+  }
+
+  private def processNewPR(pr: PickupRequest): PickupRequest = {
+    val elevators     = model.elevatorsSystemState
+    val sameDirection = elevators.values.filter(_.state.direction == pr.direction).toList
+
+    // todo backup plan / enqueue !!
+    def process(closestOne: Option[Elevator]) = {
+      val anyone = closestOne orElse elevators.values.find(_.isIdle)
+      pr.lens(_.pendingFor).set(anyone.map(_.id))
+    }
+
+    pr.direction match {
+      case Up =>
+        val closestOne = sameDirection
+          .filter(_.state.floor.value < pr.floor.value)
+          .sortBy(pr.floor.value - _.state.floor.value)
+          .headOption
+        process(closestOne)
+      case Down =>
+        val closestOne = sameDirection
+          .filter(_.state.floor.value > pr.floor.value)
+          .sortBy(_.state.floor.value - pr.floor.value)
+          .headOption
+        process(closestOne)
+      case Idle => pr
+    }
+  }
+
+  private def findTargets(elevator: Elevator): Elevator = {
+    if (elevator.getTargets.nonEmpty) {
+      val destination = elevator.getTargets.head // todo better destination strategy
+      elevator.lens(_.state.direction).set(elevator.calculateDirection(destination))
+    } else {
+      model.pickupRequests
+        .find(_.pendingFor.isEmpty)
+        .map(pr => elevator.lens(_.state.target).modify(_ + pr.floor))
+        .getOrElse(elevator)
+      // todo inform pr?
+    }
+  }
+
+  def getStepCounter: Int = model.stepCounter
+
+  def getPickupRequests: Set[PickupRequest] = model.pickupRequests
+
+  private def updateModel(updatedModel: Model => Model): Unit =
+    model = updatedModel(model)
 }
