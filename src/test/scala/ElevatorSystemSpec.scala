@@ -1,4 +1,5 @@
-import ElevatorControlSystemModel._
+import core.ElevatorControlSystemModel._
+import core._
 import org.scalatest._
 import monocle.macros.syntax.lens._
 

@@ -1,9 +1,11 @@
-import monocle.macros.Lenses
-import scala.collection.immutable
-import monocle.macros.syntax.lens._
+package core
+
 import monocle.function.At.at
-import monocle.std.map._
+import monocle.macros.Lenses
+import monocle.macros.syntax.lens._
 import monocle.syntax.ApplyLens
+
+import scala.collection.immutable
 
 object ElevatorControlSystemModel {
 

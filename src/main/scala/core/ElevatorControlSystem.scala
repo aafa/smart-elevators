@@ -1,20 +1,25 @@
-import ElevatorControlSystemModel._
+package core
+
+import core.ElevatorControlSystemModel._
 
 trait ElevatorControlSystem {
-  def status(): Seq[Elevator]
+  def status(): Vector[Elevator]
   def update(state: ElevatorControlState): Unit
   def update(elevator: Elevator): Unit
   def pickup(pr: PickupRequest): Unit
   def step(): Unit
+  def getStepCounter: Int
+  def getPickupRequests: Set[PickupRequest]
 }
 
 class SimpleElevatorsController extends ElevatorControlSystem {
   import monocle.macros.syntax.lens._
+  val groundFloor = 1
 
   @volatile var model = Model()
 
-  override def status(): Seq[Elevator] =
-    model.elevatorsSystemState.values.toList
+  override def status(): Vector[Elevator] =
+    model.elevatorsSystemState.values.toVector
 
   override def update(updatedState: ElevatorControlState): Unit =
     updatedState.foreach { case (_, elevator) => update(elevator) }
@@ -43,6 +48,15 @@ class SimpleElevatorsController extends ElevatorControlSystem {
 
     updateModel(_.lens(_.pickupRequests).modify(filterOutPrs))
   }
+
+  def getStepCounter: Int = model.stepCounter
+
+  def getPickupRequests: Set[PickupRequest] = model.pickupRequests
+
+  def genInitialState(elevatorsCount: Int): Unit =
+    (1 to elevatorsCount).iterator.foreach(i => {
+      this.update(Elevator(i, groundFloor))
+    })
 
   def filterOutPrs(pr: Set[PickupRequest]): Set[PickupRequest] = {
     val opened = model.elevatorsSystemState.values.toList.filter(_.state.door == Opened)
@@ -133,10 +147,6 @@ class SimpleElevatorsController extends ElevatorControlSystem {
       // todo inform pr?
     }
   }
-
-  def getStepCounter: Int = model.stepCounter
-
-  def getPickupRequests: Set[PickupRequest] = model.pickupRequests
 
   private def updateModel(updatedModel: Model => Model): Unit =
     model = updatedModel(model)
