@@ -14,13 +14,14 @@ import scalatags.JsDom.all._
 
 object MainHall extends JSApp {
 
-  val stepTimeMs = 400
-  val floors     = 9
+  val stepTimeMs     = 800
+  val floors         = 9
+  val elevatorsCount = 5
 
   @JSExport
   def main(b: html.Body): Unit = {
     val elevators = new SimpleElevatorsController
-    elevators.genInitialState(elevatorsCount = 5)
+    elevators.genInitialState(elevatorsCount = elevatorsCount)
 
     renderContent(b, elevators)
     dom.window.setInterval(() => {
@@ -36,7 +37,7 @@ object MainHall extends JSApp {
 
     def cellDiv(string: JsDom.Modifier) = cellDivColumns(string, columns)
     def cellDivColumns(string: JsDom.Modifier, columnsP: Int) =
-      div(`class` := s"pure-u-1-$columnsP l-box", p(string))
+      div(`class` := s"pure-u-1-$columnsP l-box", string)
 
     type Cells = Vector[GridCell]
     type Tag   = JsDom.TypedTag[HTMLElement]
@@ -51,9 +52,9 @@ object MainHall extends JSApp {
         def selectionColor(d: Direction): String = {
           val maybeRequest = elevatorControlSystem.getPickupRequests.find(_.floor.value == floor)
           if (maybeRequest.exists(_.direction == d))
-            "pure-button pure-button-primary"
+            "pure-button button-large floor-button pure-button-primary"
           else
-            "pure-button"
+            "pure-button button-large floor-button"
         }
 
         def pickup(direction: Direction) =
@@ -61,11 +62,11 @@ object MainHall extends JSApp {
 
         cellDiv(if (floor > 0) {
           div(
-            floor.toString,
-            button("up", onclick := { () =>
+            floor.toString + "\t\t\t\t",
+            button("▲", onclick := { () =>
               pickup(Up)
             }, `class` := selectionColor(Up)),
-            button("down", onclick := { () =>
+            button("▼", onclick := { () =>
               pickup(Down)
             }, `class` := selectionColor(Down))
           )
@@ -78,7 +79,14 @@ object MainHall extends JSApp {
     case class ElevatorColumn(elevator: Elevator) extends GridCell {
       def view(floor: Int): Tag =
         cellDiv(if (elevator.state.floor.value == floor) {
-          if (elevator.state.door == Opened) "[...]" else "[]"
+          if (elevator.state.door == Opened) "[.....]"
+          else {
+            elevator.state.direction match {
+              case Up   => "[▲]"
+              case Down => "[▼]"
+              case Idle => "[]"
+            }
+          }
         } else {
           ""
         })
@@ -88,9 +96,9 @@ object MainHall extends JSApp {
       def view(floor: Int): Tag = {
         def selectionColor(f: Int): String = {
           if (elevator.state.target.exists(_.value == f))
-            "pure-button button-xlarge pure-button-primary"
+            "pure-button pure-button-primary"
           else
-            "pure-button button-xlarge"
+            "pure-button"
         }
 
         def go(f: Int) =
@@ -98,10 +106,11 @@ object MainHall extends JSApp {
 
         cellDiv(
           (1 to floors).iterator
-            .map(i =>
+            .map(i => {
               cellDivColumns(button(i.toString, onclick := { () =>
                 go(i)
-              }, `class` := selectionColor(i)), 3))
+              }, `class` := selectionColor(i)), 4)
+            })
             .toList)
       }
     }
@@ -114,7 +123,7 @@ object MainHall extends JSApp {
 
     val filler: Vector[Tag] =
       headerCells.map(value => value.view(0)) ++
-        (1 to floors).iterator
+        (floors to (1, -1)).iterator
           .map(row => rowCells(row).map(cell => cell.view(row)))
           .flatten
 
