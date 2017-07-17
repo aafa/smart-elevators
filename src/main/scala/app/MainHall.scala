@@ -133,7 +133,8 @@ object MainHall extends JSApp {
         div(
           `class` := "pure-g",
           filler
-        )
+        ),
+        p("version: 10")
       ).render
     )
   }
