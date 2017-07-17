@@ -2,14 +2,16 @@
 
 Design and implement an elevator control system.
 
-Initial thought process\plans [brainstorm.md]
+Initial thought process\plans (brainstorm.md)
 
 ### Techs that was used
 - Plain step-based control system implementation
+
+
 - Scala.Js UI for demo purposes
 
 ### See demo gh-page
-.. insert gh-page url here
+See `Smart elevators` demo here https://aafa.github.io/smart-elevators/index.html
 
 ### Run locally
 
