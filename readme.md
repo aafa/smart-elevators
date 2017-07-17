@@ -6,9 +6,8 @@ Initial thought process\plans [brainstorm.md](brainstorm.md)
 
 ### Techs that was used
 - Plain step-based control system implementation
-
-
-- Scala.Js UI for demo purposes
+- [Monocle](https://github.com/julien-truffaut/Monocle) lib to zoom into model properties
+- [Scala.Js](https://www.scala-js.org/) UI for demo purposes
 
 ### See demo gh-page
 See `Smart elevators` demo here https://aafa.github.io/smart-elevators/index.html
