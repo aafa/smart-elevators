@@ -2,7 +2,11 @@
 
 Design and implement an elevator control system.
 
-Initial thought process\plans [brainstorm.md](brainstorm.md)
+Work process:
+- Initial thought process\plans [brainstorm.md](brainstorm.md)
+- Factual time spent: ~12 hours, due to 
+    - `scala.js` weird quirks I was not aware of (`workbench` stop updating `js` properly for no reason etc) `investigate!`
+    - initially thought of doing `Diode`'s event-based model (and started working on implementation) but that looked like an over-engineering given small time constrains (immutable model with event handling is tricky)
 
 ### Techs that was used
 - Plain step-based control system implementation
