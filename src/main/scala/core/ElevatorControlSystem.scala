@@ -111,11 +111,22 @@ class SimpleElevatorsController extends ElevatorControlSystem {
   private def processNewPR(pr: PickupRequest): PickupRequest = {
     val elevators = model.elevatorsSystemState
     val sameDirection =
-      elevators.values.filter(d => d.state.direction == pr.direction || d.isIdle).toList
+      elevators.values
+        .filter(d => d.state.direction == pr.direction)
+        .filter(
+          elevator =>
+            model.pickupRequests
+              .filter(_.pendingFor.exists(_ == elevator.id))
+              .exists(_.direction == pr.direction))
+        .toList
 
     // todo backup plan / enqueue !!
     def process(closestOne: Option[Elevator]) = {
-      val anyone = closestOne orElse elevators.values.find(_.isIdle)
+      val anyone = closestOne orElse elevators.values
+        .filter(_.isIdle)
+        .toVector
+        .sortBy(v => Math.abs(pr.floor.value - v.state.floor.value))
+        .headOption
       pr.lens(_.pendingFor).set(anyone.map(_.id))
     }
 
