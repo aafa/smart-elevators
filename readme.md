@@ -2,7 +2,7 @@
 
 Design and implement an elevator control system.
 
-Initial thought process\plans (brainstorm.md)
+Initial thought process\plans [brainstorm.md](brainstorm.md)
 
 ### Techs that was used
 - Plain step-based control system implementation
